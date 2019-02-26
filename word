@@ -1,0 +1,125 @@
+
+最近有计划在laracast 上写学习 laracsts 的新课程 Build A Laravel App With TDD，一直在虚拟机上学习各种laravel的操作的我，突然觉得，为什么不趁这个机会，试试在生产环境上搭建一个laravel 环境，再来学习这个教程？
+
+
+于是一拍大腿说干就干，申请了一个aws号就开始了，结果才发现这个对于不熟悉 lamp 各种设定，只会写代码的人来说简直是一场噩梦，看了很多教程，大部分给新人的感觉就是，你只要做了什么什么事情， duang 就装好了，再加上很多都是好多年前的教程，aws 和 lara 的界面以及操作代码和现在的都不一定一样。从新手的角度看 真是一脸懵逼呀。
+ 
+本文算是菜鸟写给菜鸟的一篇教程，其实主要还是写给我自己，如果以后再次有这方面的需要可以回来看一眼，很多书写模式都是按照自己看得懂什么意思，要是大家一下没看明白卡在哪了可以给我说。
+高手可以不用看了，但是如果不介意指点一二那也自然是不胜感激。
+本文参考了
+laravel 5.7的文档: https://laravel.com/docs/5.7/
+YouTube上一个并不是明星程序员主播发的 laravel 5.4 aws ec2 部署教程：
+
+ 
+第一步申请一个aws 账号，lz人在国外，看了一下国内的界面好像不太一样，无法指导，大家想办法弄一个就是了。
+第一步， aws ec 2 实例创建：
+1. 来到 AWS 主界面，点击导航栏的 “服务” 找到 ec2
+
+
+2. 点击 蓝色按钮 “启动实例”
+
+3. 挑选Ubuntu   16.04 服务器（注意每个机器的图标下面都有是否提供免费试用的提醒）
+
+4. 挑选实例类型 就可以启动了，第三个灰色按钮可以设置更多的细节，但是如果只是练手的小项目，我个人觉得是可以忽略的。
+
+5.  在启动前，设置安全组也是很重要的一步。 点击 “编辑安全组”
+
+
+   6. 把端口 22 ssh 和3306 设置成 “我的ip” 把80 端口设置成 所有人。（安全组是aws 中及其重要的一部分，有兴趣的同学也可以看看专门的aws 教程）设置完成就可以启动了。
+
+7. 正式启动前 aws  会要求用户创建一个钥匙，只有ip符合，并且拥有钥匙的人 才可以远程操作这个实例和以及实例中的数据库。记得下载了以后 妥善保存钥匙文件。下载完钥匙文件，我们就可以启动这个实例了。
+
+
+第二步，SSH远程链接Ubuntu
+1. 将第一步生成的钥匙文件妥善保存在一个文件夹里，在terminal（iTerm）中打开该文件夹：
+
+2. 在 aws ec2的主界面，找到刚才创建的实例， 右键，选择“链接” ， 跳出来的小窗就有链接ssh 需要的一切linux代码了。文中打码处是Public DNS，这个同样可以在主界面里找到。
+
+
+3. 继续第1步的terminal ，在terminal 中输入 chmod 400 larakey.pem（larakey是我在第一步里自己取的钥匙名字，以个人钥匙），然后再输入“ssh -i "larakey.pem" ubuntu@ec2-xxxxxxx-xxxx.ap-southeast-2.compute.amazonaws.com”（ubuntu@后面请参考自己的 Public DNS）
+
+
+第三步 设置 lamp 环境
+1. 首先 ， 根据laravel 5.7的官方文档，laravel 5.7 需要php 7.1.3以上的版本，所以要安装php 7.13以上的版本。 在terminal中输入：
+                            
+sudo add-apt-repository ppa:ondrej/php 
+sudo apt-get update 
+sudo apt-get install php7.2
+
+
+2. sudo apt-get install apache2 安装apache服务器
+
+3. sudo apt-get install mysql-server 安装mysql （中间需要设置root 用户密码）
+4. 测试网站，在aws 界面找到Public DNS (IPv4) 复制到浏览器中就可以看到apache的默认页面了。 这个页面的存放位置是/var/www/html, 这些信息在这个默认界面都有。
+
+5. 使用sequel pro 测试远程数据库，这一步如果有问题，十次有九次是第一步安全组没有设置好，如果链接失败可以看看安全组有没有开放3306端口，并且有没有开放当前使用机器的ip。
+    
+
+    6.链接成功如图：
+
+
+第四步 部署aws
+1. cd /var/www/html 定位到公共 html 路径。（其实也可以在别的路径下操作，只是个人习惯而已）
+
+2. 安装composer 分别敲入：
+sudo curl -O https://getcomposer.org/composer.phar
+sudo mv composer.phar composer
+sudo chmod +x composer
+sudo mv composer /usr/local/bin
+        composer 可用
+3. 现在可以无视官网上的system requirement 尝试安装一下 （代码： sudo composer create-project --prefer-dist laravel/laravel blog），结果当然失败了。错误是缺少Mbstring 拓展，所以terminal中输入 sudo apt-get install php-mbstring 安装拓展
+
+
+4. sudo rm -rf blog 删除blog 路径，再次尝试 依然失败，可以 看见 缺少 ext-dom，搜索引擎搜索关键词“requires ext-dom” 找到了一个回答（https://stackoverflow.com/questions/43408604/php7-install-ext-dom-issue）是需要安装 xml 拓展，于是按照stckoverflow 这个回答，输入命令 sudo apt-get install php7.2-xml
+            
+            同时需要注意黄色高亮的一段警告（ Failed to download laravel/laravel from dist: The zip extension and unzip command are both missing,），系统缺少zip unzip 命令，于是顺手就安装一下。sudo apt-get install zip unzip 这个包在laravel 5.7系统需求里并没有提到，我猜大概是因为太基础了，lara 官方认为人人都会有，所以就没写了，值得各位新手们注意。
+
+5. 再一次尝试部署laravel（代码： sudo composer create-project --prefer-dist laravel/laravel blog ）成功！
+
+        *6. 官网上不是提了很多插件（PDO，OpenSSL，Tokenizer等等），为什么只装了两个就完成了呢？我的理解是很多插件，在安装php 7.2 的时候就已经包含进去了，所以就不需要安装了。这个信息可以在phpinfo 里看见（我也不知道我理解的对还是不对，如果错了还请高手指正）。
+在terminal中定位到“/var/www/html”输入 sudo vim info.php
+键盘上 按 “i”键，输入“<?php phpinfo();?>”, 按“esc”键，按“:wq” 。
+在浏览器的地址栏输入 Public DNS (IPv4)(aws ec2 页面可以找到)/info.php
+
+OpenSSL：
+
+
+PDO：
+
+Tokenizer
+
+Ctype
+
+JSON
+
+并没有找到  BCMath PHP Extension 相关的信息，
+或许是这个？
+
+ 为了防止以后项目出问题卡住，我谷歌了一下如何安装BCMath php 插件：sudo apt-get install php7.2-bcmath
+再次强调一下这部分只是自己的猜测，也不知道对不对，希望有高手能指点一下。
+7. 回到第5步，可以在浏览器地址拦输入：Public DNS (IPv4)/blog/public, 很明显，是我们熟悉的 laravel 的报错方式，基本上说明，部署已经成功了！
+报错 "The stream or file "/var/www/html/blog/storage/logs/laravel-2019-02-26.log" could not be opened: failed to open stream: Permission denied"解决这个问题就要感谢 之前的哪位非明星程序员主播了。
+在terminal 进入blog（自己创建的laravel 项目文件夹）输入：
+sudo chmod 777 -R storage/
+sudo chmod 777 -R bootstrap/
+回到浏览器刷新，我们熟悉的laravel 起始界面就出现了！
+
+
+8. terminal 来到 cd /etc/apache2/sites-available/ ,我们需要修改的就是 那个000-default.conf 文件（sudo vim 000-default.conf不熟悉vim 的同学也可以把vim改成nano）。
+
+
+
+9. 找到 DocumentRoot /var/www/html 这一行 改成DocumentRoot /var/www/html/blog/public
+
+10. 在</VirtualHost> 前加入：
+<Directory "/var/www/html"> 
+            AllowOverride all 
+            Require all granted 
+</Directory>
+保存退出
+
+11. 在terminal输入 sudo service apache2 restart 重启apache服务器，完成后，用Public DNS (IPv4) （不加 blog/public） 就可以直接访问刚才创建的laravel 项目了
+
+总结，昨天一整天都在研究如何部署，很多文章就是给了一堆代码让我们自己去输就是了，于是我一个个去试，走了好多弯路，浪费了好多时间，但是我自己知道，因为我记性不太好，以后再次需要部署的时候又要从头到尾再来一遍（虽然aws 应该是可以保存模版的），为了避免以后浪费时间， 我就试着再来一遍，并且记录下每一步做了什么。
+我的微信：qiuxan1989 如果有什么纰漏的地方，或者需要交流的地方可以联系我。
+同时本人坐标墨尔本，现有工作特别闲，学习时间很多， 正在考虑跳槽，有初级程序员的位置的雇主们可以联系一下。😊😊😊
